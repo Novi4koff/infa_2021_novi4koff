@@ -24,11 +24,11 @@ class ball:
         self.y = randint(300, 600)
         self.v_x = randint(-300, 300)
         self.v_y = randint(-300, 300)
-        self.r = (5, 30)
+        self.r = randint(5, 30)
         self.color = COLORS[randint(0, 5)]
 
     def draw(self, surface):
-        circle(surface, self.color, (self.x, self,y), self.r)
+        circle(surface, self.color, (self.x, self.y), self.r)
 
     def move(self):
         if (self.x + self.r > 1200) or (self.x - self.r < 0):
@@ -40,7 +40,7 @@ class ball:
 
 list_of_balls = list()
 
-for i in range(randint(10)):
+for i in range(randint(5, 10)):
     tmp_ball = ball()
     list_of_balls.append(tmp_ball)
     list_of_balls[i].init()
@@ -62,6 +62,3 @@ while not finished:
     screen.fill(BLACK)
     
 pygame.quit()
-
-
-

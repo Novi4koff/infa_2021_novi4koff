@@ -4,7 +4,7 @@ from random import *
 import pygame
 
 
-FPS = 30
+FPS = 400
 
 RED = 0xFF0000
 BLUE = 0x0000FF
@@ -20,10 +20,15 @@ GAME_COLORS = [RED, BLUE, YELLOW, GREEN, MAGENTA, CYAN]
 WIDTH = 800
 HEIGHT = 600
 
-g = 5
+POINTS = 0
+time = 420
+name = 'dima'
+
+global targets
+targets = list()
 
 class Ball:
-	def __init__(self, screen: pygame.Surface, x=40, y=450):
+	def __init__(self, screen: pygame.Surface, x=400, y=570):
 		""" Конструктор класса ball
 		Args:
 		x - начальное положение мяча по горизонтали
@@ -37,6 +42,12 @@ class Ball:
 		self.vy = 0
 		self.color = choice(GAME_COLORS)
 		self.live = 30
+	
+	def collision(self):
+		if self.x + self.r > 800 or self.x - self.r < 0:
+			self.vx *= -0.99
+		if self.y + self.r > 600:
+			self.vy *= -0.99
 		
 	def move(self):
 		"""Переместить мяч по прошествии единицы времени.
@@ -44,13 +55,12 @@ class Ball:
 		self.x и self.y с учетом скоростей self.vx и self.vy, силы гравитации, действующей на мяч,
 		и стен по краям окна (размер окна 800х600).
 		"""
-		if self.x + self.r > 800 or self.x - self.r < 0:
-			self.vx *= -1
-		if self.y + self.r > 600:
-			self.vy *= -1
-		self.vy += g
-		self.x += self.vx
-		self.y += self.vy
+		self.x += self.vx * 0.035
+		self.y -= self.vy * 0.035
+		self.vy -= 10 * 0.035
+		self.live -= 0.01
+		if self.live <= 0:
+			balls.remove(self)
 		
 	def draw(self):
 		pygame.draw.circle(self.screen, self.color, (self.x, self.y), self.r)
@@ -62,10 +72,14 @@ class Ball:
 		Returns:
 		    Возвращает True в случае столкновения мяча и цели. В противном случае возвращает False.
 		"""
-		if (self.x - obj.x)**2 + (self.y - obj.y)**2 <= (self.r + obj.r)**2:
-			return True
+		X = (self.x - obj.x) ** 2
+		Y = (self.y - obj.y) ** 2
+		Z = (X + Y) ** 0.5
+		if Z > self.r + obj.r:
+			return 0
 		else:
-			return False
+			self.live = 0
+			return 1
 
 class Gun:
 	def __init__(self, screen):
@@ -73,6 +87,8 @@ class Gun:
 		self.f2_power = 10
 		self.f2_on = 0
 		self.an = 1
+		self.x = 400
+		self.y = 570
 		self.color = GREY
 	
 	def fire2_start(self, event):
@@ -104,7 +120,15 @@ class Gun:
 			self.color = GREY
 	
 	def draw(self):
-		pygame.draw.rect(self.screen, self.color, (40, 450, 10, 5))
+		x0 = pygame.mouse.get_pos()[0]
+		y0 = pygame.mouse.get_pos()[1]
+		x1 = x0 - self.x
+		y1 = self.y - y0
+		z = (x1 ** 2 + y1 ** 2) ** 0.5
+		k = self.f2_power * 2 / z
+		x2 = k * x1
+		y2 = k * y1
+		pygame.draw.polygon(screen, self.color, [(self.x, self.y), (self.x + x2, self.y - y2)], 5)
 	
 	def power_up(self):
 		if self.f2_on:
@@ -114,43 +138,77 @@ class Gun:
 		else:
 			self.color = GREY
 
-class Target:
-	def __init__(self, screen: pygame.Surface):
-		self.points = 0
-		self.screen = screen
-		Target.new_target(self)
-	
-	def new_target(self):
+class Target():
+	def new_target(self, screen):
 		""" Инициализация новой цели. """
-		global x, y, r, color, live
-		live = self.live = 1
-		x = self.x = randint(600, 780)
-		y = self.y = randint(300, 550)
+		x = self.x = randint(100, 500)
+		y = self.y = randint(100, 450)
 		r = self.r = randint(2, 50)
+		self.vx = randint(5, 20)
+		self.vy = randint(5, 20)
+		self.screen = screen
+		self.live = 100
+		self.points = 1
 		color = self.color = RED
 	
-	def hit(self, points=1):
+	def hit(self, points):
 		"""Попадание шарика в цель."""
-		self.points += points
+		target = Target()
+		target.new_target(screen)
+		targets.append(target)
+		points += self.points
+		targets.remove(self)
+		return points
 	
 	def draw(self):
-		pygame.draw.circle(self.screen, color, (x, y), r)
+		pygame.draw.circle(self.screen, self.color, (self.x, self.y), self.r)
+		self.live -= 0.01
+		if self.live <= 0:
+			targets.remove(self)
+	
+	def move(self):
+		self.x += self.vx * 0.035
+		self.y -= self.vy * 0.035
+	
+	def collision(self):
+		if self.x + self.r > 800 or self.x - self.r < 0:
+			self.vx *= -1
+		if self.y - self.r < 0 or self.y + self.r > 500:
+			self.vy *= -1
+
+def draw_life_screen(points, name, time):
+	myfont = pygame.font.SysFont('Comic Sans MS', 30)
+	textsurface = myfont.render(str(points), False, BLACK)
+	screen.blit(textsurface, (10, 10))
 
 
 pygame.init()
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
+
+print('Напишите количество целей')
+number_of_targets = int(input())
+
 bullet = 0
 balls = []
 
 clock = pygame.time.Clock()
 gun = Gun(screen)
-target = Target(screen)
+
+for i in range(number_of_targets):
+	target = Target()
+	target.new_target(screen)
+	targets.append(target)
+
 finished = False
 
 while not finished:
 	screen.fill(WHITE)
 	gun.draw()
-	target.draw()
+	for t in targets:
+		t.draw()
+		t.collision()
+		t.move()
+	draw_life_screen(POINTS, name, time)
 	for b in balls:
 		b.draw()
 	pygame.display.update()
@@ -167,11 +225,13 @@ while not finished:
 			gun.targetting(event)
 	
 	for b in balls:
+		b.collision()
 		b.move()
-		if b.hittest(target) and target.live:
-			target.live = 0
-			target.hit()
-			target.new_target()
-		gun.power_up()
+		for target in targets:
+			if b.hittest(target) and target.live:
+				target.live = 0
+				POINTS = target.hit(POINTS)
+		draw_life_screen(POINTS, name, time)
+	gun.power_up()
 
 pygame.quit()
